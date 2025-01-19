@@ -9,11 +9,11 @@
 
 - 👨‍💻 All of my projects are available at [https://tavareschan.itch.io/](https://tavareschan.itch.io/)
 
-- 💬 Ask me about **my cat Nico**
-
 - 📫 How to reach me **tavares.gargur@gmail.com**
 
 - 📄 Know about my experiences [See my resume!](https://docs.google.com/document/d/1Ajxy81cikJnFgnlf9ruDzKu_gFZpfBCR0vb7WMHib2w/edit?usp=sharing)
+
+- 💬 Ask me about **my cat Nico**
 
 <h3 align="left">Connect with me:</h3>
 <p align="left">

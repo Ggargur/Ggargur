@@ -13,7 +13,7 @@
 
 - 📫 How to reach me **tavares.gargur@gmail.com**
 
-- 📄 Know about my experiences [https://docs.google.com/document/d/1Ajxy81cikJnFgnlf9ruDzKu_gFZpfBCR0vb7WMHib2w/edit?usp=sharing](https://docs.google.com/document/d/1Ajxy81cikJnFgnlf9ruDzKu_gFZpfBCR0vb7WMHib2w/edit?usp=sharing)
+- 📄 Know about my experiences [See my resume!](https://docs.google.com/document/d/1Ajxy81cikJnFgnlf9ruDzKu_gFZpfBCR0vb7WMHib2w/edit?usp=sharing)
 
 <h3 align="left">Connect with me:</h3>
 <p align="left">

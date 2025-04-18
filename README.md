@@ -10,16 +10,16 @@
 ###
 
 <div align="center">
-  <a href="gitlab.com/Ggargur" target="_blank">
+  <a href="https://gitlab.com/Ggargur" target="_blank">
     <img src="https://img.shields.io/static/v1?message=GitLab&logo=gitlab&label=&color=FC6D26&logoColor=white&labelColor=&style=for-the-badge" height="35" alt="gitlab logo"  />
   </a>
-  <a href="tavares.gargur@gmail.com" target="_blank">
+  <a href="mailto:tavares.gargur@gmail.com" target="_blank">
     <img src="https://img.shields.io/static/v1?message=Gmail&logo=gmail&label=&color=D14836&logoColor=white&labelColor=&style=for-the-badge" height="35" alt="gmail logo"  />
   </a>
-  <a href="linkedin.com/in/tavares-gargur/" target="_blank">
+  <a href="https://linkedin.com/in/tavares-gargur/" target="_blank">
     <img src="https://img.shields.io/static/v1?message=LinkedIn&logo=linkedin&label=&color=0077B5&logoColor=white&labelColor=&style=for-the-badge" height="35" alt="linkedin logo"  />
   </a>
-  <a href="tavareschan.itch.io/" target="_blank">
+  <a href="https://tavareschan.itch.io/" target="_blank">
     <img src="https://img.shields.io/static/v1?message=itch.io&logo=itch&label=&color=000000&logoColor=white&labelColor=&style=for-the-badge" height="35" alt="itch logo"  />
   </a>
 </div>

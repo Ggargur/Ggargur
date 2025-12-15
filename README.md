@@ -3,13 +3,6 @@
 ###
 
 <div align="center">
-  <img src="https://streak-stats.demolab.com?user=Ggargur&locale=en&mode=daily&theme=dracula&hide_border=false&border_radius=5" height="150" alt="streak graph"  />
-  <img src="https://github-readme-stats.vercel.app/api/top-langs?username=Ggargur&locale=en&hide_title=false&layout=compact&card_width=320&langs_count=5&theme=dracula&hide_border=false" height="150" alt="languages graph"  />
-</div>
-
-###
-
-<div align="center">
   <a href="https://gitlab.com/Ggargur" target="_blank">
     <img src="https://img.shields.io/static/v1?message=GitLab&logo=gitlab&label=&color=FC6D26&logoColor=white&labelColor=&style=for-the-badge" height="35" alt="gitlab logo"  />
   </a>

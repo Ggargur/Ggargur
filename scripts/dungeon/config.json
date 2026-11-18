@@ -1,0 +1,16 @@
+{
+  "user": "Ggargur",
+  "hero": "Tavaresh",
+  "title": "the Game Dev",
+  "width": 78,
+  "height": 22,
+  "weights": { " ": 200, "#": 5 },
+  "rooms": [
+    { "key": "1", "name": "double-u", "repo": "double-u" },
+    { "key": "2", "name": "WFC", "repo": "WFC" },
+    { "key": "3", "name": "mudcrab", "repo": "mudcrab" },
+    { "key": "4", "name": "outline-mod", "repo": "outline-mod" },
+    { "key": "5", "name": "Kitty Rhythm TD" },
+    { "key": "6", "name": "Wild Magic" }
+  ]
+}

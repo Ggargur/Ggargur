@@ -13,6 +13,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import random
 import urllib.request
@@ -186,12 +187,43 @@ def find_rooms(grid):
     return rooms
 
 
-def generate(seed_text: str, width: int, height: int, wanted: int, weights: dict | None = None):
+def shrink_room(grid, room, target: int) -> dict:
+    """Shrink a rectangular room in place so its floor area is about ``target``."""
+    w, h = room["x1"] - room["x0"] + 1, room["y1"] - room["y0"] + 1
+    scale = math.sqrt(target / (w * h))
+    nh = max(1, min(h, round(h * scale)))
+    nw = max(1, min(w, round(target / nh)))
+    if nw * nh < 2:  # leave space for the room number and @
+        nw, nh = (2, 1) if w >= 2 else (1, 2)
+    for y in range(room["y0"] - 1, room["y1"] + 2):
+        for x in range(room["x0"] - 1, room["x1"] + 2):
+            grid[y][x] = ROCK
+    x0, y0 = room["x0"] + (w - nw) // 2, room["y0"] + (h - nh) // 2
+    x1, y1 = x0 + nw - 1, y0 + nh - 1
+    for x in range(x0, x1 + 1):
+        grid[y0 - 1][x], grid[y1 + 1][x] = "─", "━"
+    for y in range(y0, y1 + 1):
+        grid[y][x0 - 1], grid[y][x1 + 1] = "│", "┃"
+        for x in range(x0, x1 + 1):
+            grid[y][x] = FLOOR
+    grid[y0 - 1][x0 - 1], grid[y0 - 1][x1 + 1] = "┌", "┐"
+    grid[y1 + 1][x0 - 1], grid[y1 + 1][x1 + 1] = "└", "┘"
+    cells = [(x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)]
+    return {"cells": cells, "x0": x0, "y0": y0, "x1": x1, "y1": y1}
+
+
+def generate(seed_text: str, width: int, height: int, commits: list[int], weights: dict | None = None):
+    """WFC lays out the rooms; the busiest repo gets the biggest one.
+
+    Rooms are then shrunk so their floor area follows each repo's share of
+    commits, and finally joined with corridors.
+    """
     types = learn(load_sample())
     # Like CellType.weight in the Unity package: tune how often a tile is picked.
     for tile, weight in (weights or {}).items():
         types[tile].weight = weight
     base = int(hashlib.sha256(seed_text.encode()).hexdigest(), 16)
+    needed = max(len(commits), 1) + 1  # + the room with the stairs
     for attempt in range(200):
         try:
             rows = MapCreator(types, width, height, seed=base + attempt).create()
@@ -199,26 +231,45 @@ def generate(seed_text: str, width: int, height: int, wanted: int, weights: dict
             continue
         grid = [list(r) for r in rows]
         clear_corridors(grid)
-        rooms = find_rooms(grid)
-        big = [r for r in rooms if len(r["cells"]) >= 6 and r["x1"] > r["x0"]]
-        if len(big) < wanted + 1:
+        big = sorted(
+            (r for r in find_rooms(grid) if len(r["cells"]) >= 6 and r["x1"] > r["x0"]),
+            key=lambda r: -len(r["cells"]),
+        )
+        if len(big) < needed:
             continue
-        rooms.sort(key=lambda r: -len(r["cells"]))
-        if not connect(grid, rooms):
+        stairs = big[needed - 1]
+        assigned = big[: needed - 1]
+        if commits:
+            largest = len(assigned[0]["cells"])
+            for i, room in enumerate(assigned):
+                target = max(2, round(largest * commits[i] / commits[0]))
+                if target < len(room["cells"]):
+                    assigned[i] = shrink_room(grid, room, target)
+        if not connect(grid, sorted(find_rooms(grid), key=lambda r: -len(r["cells"]))):
             continue
-        big.sort(key=lambda r: -len(r["cells"]))
-        return grid, big, attempt
+        return grid, assigned, stairs, attempt
     raise UnfortunateSeedError(f"no connected dungeon for seed {seed_text}")
 
 
 # --------------------------------------------------------------------- data
 
-def github_stats(user: str, repos: list[str], token: str | None) -> dict:
-    aliases = "\n".join(
-        f'r{i}: repository(owner: "{user}", name: "{name}") {{ pushedAt }}'
-        for i, name in enumerate(repos)
+def graphql(query: str, token: str | None) -> dict:
+    req = urllib.request.Request(
+        "https://api.github.com/graphql",
+        data=json.dumps({"query": query}).encode(),
+        headers={"Authorization": f"bearer {token}", "User-Agent": "dungeon-readme"},
     )
-    query = f"""{{
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        body = json.load(resp)
+    if body.get("errors"):
+        raise RuntimeError(body["errors"])
+    return body["data"]
+
+
+def github_stats(user: str, today: dt.date, lookback: int, token: str | None) -> dict:
+    since = today - dt.timedelta(days=lookback)
+    u = graphql(
+        f"""{{
       user(login: "{user}") {{
         createdAt
         contributionsCollection {{ contributionCalendar {{ totalContributions }} }}
@@ -226,63 +277,71 @@ def github_stats(user: str, repos: list[str], token: str | None) -> dict:
         owned: repositories(first: 100, privacy: PUBLIC, ownerAffiliations: OWNER, isFork: false) {{
           nodes {{ stargazerCount }}
         }}
+        recent: contributionsCollection(from: "{since}T00:00:00Z", to: "{today}T00:00:00Z") {{
+          commitContributionsByRepository(maxRepositories: 100) {{
+            repository {{ name nameWithOwner url isPrivate owner {{ login }} }}
+            contributions(first: 100) {{ nodes {{ occurredAt commitCount }} }}
+          }}
+        }}
       }}
-      {aliases}
-    }}"""
-    req = urllib.request.Request(
-        "https://api.github.com/graphql",
-        data=json.dumps({"query": query}).encode(),
-        headers={"Authorization": f"bearer {token}", "User-Agent": "dungeon-readme"},
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.load(resp)["data"]
-    u = data["user"]
+    }}""",
+        token,
+    )["user"]
+    # date -> {repo: (label, url, commits)}
+    days: dict[str, dict[str, list]] = {}
+    for entry in u["recent"]["commitContributionsByRepository"]:
+        repo = entry["repository"]
+        if repo["isPrivate"]:
+            continue
+        label = repo["name"] if repo["owner"]["login"].lower() == user.lower() else repo["nameWithOwner"]
+        for node in entry["contributions"]["nodes"]:
+            day = days.setdefault(node["occurredAt"][:10], {})
+            day.setdefault(repo["nameWithOwner"], [label, repo["url"], 0])[2] += node["commitCount"]
+    last_day = max(days, default=None)
+    activity = sorted(days.get(last_day, {}).values(), key=lambda r: (-r[2], r[0].lower()))
     return {
         "created": u["createdAt"][:10],
         "contributions": u["contributionsCollection"]["contributionCalendar"]["totalContributions"],
         "repos": u["repositories"]["totalCount"],
         "stars": sum(n["stargazerCount"] for n in u["owned"]["nodes"]),
-        "pushed": {name: (data.get(f"r{i}") or {}).get("pushedAt") or "" for i, name in enumerate(repos)},
+        "day": last_day,
+        "activity": [{"name": n, "url": url, "commits": c} for n, url, c in activity],
     }
 
 
 OFFLINE_STATS = {
-    "created": "2022-04-05", "contributions": 1714, "repos": 36, "stars": 2,
-    "pushed": {"mudcrab": "2026-10-29"},
+    "created": "2022-04-05", "contributions": 1714, "repos": 29, "stars": 2, "day": None,
+    "activity": [
+        {"name": "mudcrab", "url": "https://github.com/Ggargur/mudcrab", "commits": 12},
+        {"name": "WFC", "url": "https://github.com/Ggargur/WFC", "commits": 5},
+        {"name": "Ggargur", "url": "https://github.com/Ggargur/Ggargur", "commits": 2},
+        {"name": "double-u", "url": "https://github.com/Ggargur/double-u", "commits": 1},
+    ],
 }
 
 
-# ------------------------------------------------------------------- render
+# ------------------------------------------------------------------- place
 
-def place(grid, rooms, config, stats, rng):
-    projects = config["rooms"]
-    chosen = rooms[: len(projects) + 1]
-    stairs_room = chosen.pop()
-    chosen.sort(key=lambda r: (r["y0"], r["x0"]))  # reading order
-    order = list(range(len(projects)))
-    rng.shuffle(order)
+def place(assigned, stairs, stars: int, rng):
     marks = {}
-    project_room = {}
-    for room, idx in zip(chosen, order):
-        project_room[idx] = room
-        marks[(room["x0"], room["y0"])] = ("room", projects[idx]["key"])
-
-    with_repo = [i for i, p in enumerate(projects) if p.get("repo")]
-    latest = max(with_repo, key=lambda i: stats["pushed"].get(projects[i]["repo"], ""))
-    room = project_room[latest]
-    cx, cy = (room["x0"] + room["x1"]) // 2, (room["y0"] + room["y1"]) // 2
-    if (cx, cy) not in room["cells"] or (cx, cy) in marks:
-        cx, cy = room["cells"][len(room["cells"]) // 2]
+    for i, room in enumerate(assigned):
+        marks[(room["x0"], room["y0"])] = ("room", str(i + 1))
+    hero_room = assigned[0] if assigned else stairs
+    cx, cy = (hero_room["x0"] + hero_room["x1"]) // 2, (hero_room["y0"] + hero_room["y1"]) // 2
+    if (cx, cy) in marks:
+        cx, cy = hero_room["x1"], hero_room["y1"]
     marks[(cx, cy)] = ("hero", "@")
-
-    sx, sy = stairs_room["x1"], stairs_room["y1"]
+    sx, sy = stairs["x1"], stairs["y1"]
+    if (sx, sy) in marks:
+        sx = stairs["x0"]
     marks[(sx, sy)] = ("stairs", ">")
-
-    floors = [c for r in chosen + [stairs_room] for c in r["cells"] if c not in marks]
-    for c in rng.sample(floors, min(stats["stars"], 9, len(floors))):
+    floors = [c for r in assigned + [stairs] for c in r["cells"] if c not in marks]
+    for c in rng.sample(floors, min(stars, 9, len(floors))):
         marks[c] = ("gold", "$")
-    return marks, projects[latest]
+    return marks
 
+
+# ------------------------------------------------------------------- render
 
 def classify(c: str) -> str:
     if c == FLOOR:
@@ -350,33 +409,68 @@ def render_svg(grid, marks, message, status, caption, palette) -> str:
     return "\n".join(out) + "\n"
 
 
+def legend(rooms: list[dict], extra: list[dict], portfolio: str) -> str:
+    parts = [f"`{i + 1}` [{r['name']}]({r['url']}) ×{r['commits']}" for i, r in enumerate(rooms)]
+    if all(r["url"] != portfolio for r in rooms):
+        parts.append(f"`>` [portfolio]({portfolio})")
+    text = " &nbsp;·&nbsp; ".join(parts)
+    if extra:
+        text += f"<br>\n<sub>+{len(extra)} more: " + ", ".join(f"[{r['name']}]({r['url']})" for r in extra) + "</sub>"
+    return text
+
+
+def update_readme(path: Path, text: str) -> bool:
+    start, end = "<!-- dungeon:start -->", "<!-- dungeon:end -->"
+    readme = path.read_text(encoding="utf-8")
+    i, j = readme.index(start) + len(start), readme.index(end)
+    new = readme[:i] + "\n" + text + "\n" + readme[j:]
+    if new == readme:
+        return False
+    path.write_text(new, encoding="utf-8")
+    return True
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="dist")
     ap.add_argument("--seed", default=dt.date.today().isoformat())
+    ap.add_argument("--readme", type=Path, help="rewrite the legend between the dungeon markers")
     ap.add_argument("--offline", action="store_true", help="skip the GitHub API, use sample stats")
     args = ap.parse_args()
 
     config = json.loads((HERE / "config.json").read_text(encoding="utf-8"))
-    repos = [r["repo"] for r in config["rooms"] if r.get("repo")]
-    stats = OFFLINE_STATS if args.offline else github_stats(config["user"], repos, os.environ.get("GITHUB_TOKEN"))
-
-    grid, rooms, attempt = generate(
-        args.seed, config["width"], config["height"], len(config["rooms"]), config.get("weights")
-    )
-    rng = random.Random(args.seed)
-    marks, here = place(grid, rooms, config, stats, rng)
-
     today = dt.date.fromisoformat(args.seed)
+    if args.offline:
+        stats = dict(OFFLINE_STATS, day=(today - dt.timedelta(days=1)).isoformat())
+    else:
+        stats = github_stats(config["user"], today, config["lookback_days"], os.environ.get("GITHUB_TOKEN"))
+
+    rooms = stats["activity"][: config["max_rooms"]]
+    extra = stats["activity"][config["max_rooms"] :]
+    grid, assigned, stairs, attempt = generate(
+        args.seed, config["width"], config["height"], [r["commits"] for r in rooms], config.get("weights")
+    )
+    marks = place(assigned, stairs, stats["stars"], random.Random(args.seed))
+
+    hero = config["hero"]
+    if not rooms:
+        message = f"{hero} has not explored anything lately."
+    else:
+        top = rooms[0]
+        commits = f"{top['commits']} commit{'s' if top['commits'] != 1 else ''}"
+        if stats["day"] == (today - dt.timedelta(days=1)).isoformat():
+            message = f"You see here: [1] {top['name']}. {commits} yesterday."
+        else:
+            message = f"Last seen on {stats['day']} in [1] {top['name']}. {commits}."
+
     created = dt.date.fromisoformat(stats["created"])
-    message = f"You see here: [{here['key']}] {here['name']}. The last thing {config['hero']} touched."
     b = lambda v: f'<tspan class="text b">{v}</tspan>'
     status = (
-        f"{escape(config['hero'])} {escape(config['title'])}   "
+        f"{escape(hero)} {escape(config['title'])}   "
         f"HP:{b(stats['contributions'])}  LVL:{b(stats['repos'])}  GOLD:{b(stats['stars'])}  "
         f"DEPTH:{b(today.year - created.year)}  TURN:{b((today - created).days)}"
     )
-    caption = f"seed {args.seed} · generated with {config['user']}/WFC · @ you · > portfolio · $ stars"
+    caption = f"seed {args.seed} · {config['user']}/WFC · room size = commits"
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -384,7 +478,9 @@ def main() -> None:
         (out / f"dungeon-{name}.svg").write_text(
             render_svg(grid, marks, message, status, caption, palette), encoding="utf-8"
         )
-    print(f"seed {args.seed}: ok after {attempt + 1} attempt(s), {len(rooms)} linked rooms, @ in {here['name']}")
+    changed = args.readme and update_readme(args.readme, legend(rooms, extra, config["portfolio"]))
+    names = ", ".join(f"{r['name']}×{r['commits']}" for r in rooms) or "none"
+    print(f"seed {args.seed}: attempt {attempt + 1}, day {stats['day']}, rooms: {names}, readme changed: {bool(changed)}")
 
 
 if __name__ == "__main__":

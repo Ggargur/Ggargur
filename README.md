@@ -24,17 +24,11 @@ Dev de jogos do Brasil. Trabalho principalmente com Unity e C#, e ultimamente te
   <img alt="ASCII dungeon map where each numbered room is one of my projects" src="https://raw.githubusercontent.com/Ggargur/Ggargur/output/dungeon-dark.svg" />
 </picture>
 
-<sub>A new map every day, built by my <a href="https://github.com/Ggargur/WFC">Wave Function Collapse</a> port. <code>@</code> stands in the room of the project I pushed to last.</sub>
+<!-- dungeon:start -->
+`1` [portfolio](https://github.com/Ggargur/portfolio) ×8
+<!-- dungeon:end -->
 
-| Room | Project | What it is | Stack |
-| :---: | --- | --- | --- |
-| `1` | [double-u](https://github.com/Ggargur/double-u) | A statically-typed compiled language with explicit mutability and zero inheritance | Python |
-| `2` | [WFC](https://github.com/Ggargur/WFC) | Wave Function Collapse for tile-based worlds. It also draws the map above | C# · Unity |
-| `3` | [mudcrab](https://github.com/Ggargur/mudcrab) | My fork of an open-source Skyrim engine | Rust · Bevy |
-| `4` | [outline-mod](https://github.com/Ggargur/outline-mod) | Skyrim AE mod that outlines items under the crosshair with custom D3D11 shaders | C++ |
-| `5` | [Kitty Rhythm TD](https://farbeyondstudios.itch.io/kitty-rhythm-td) | Rhythm tower defense: help the kitties get the rodents to the castle | play on itch.io |
-| `6` | [Wild Magic](https://tavareschan.itch.io/wild-magic) | Survive in a world of wild magic | play on itch.io |
-| `>` | [portfolio](https://github.com/Ggargur/portfolio) | Stairs down to everything else | Vue |
+<sub>A new map every day, drawn by my <a href="https://github.com/Ggargur/WFC">WFC</a> port from the repos I touched last. Games on itch.io: <a href="https://farbeyondstudios.itch.io/kitty-rhythm-td">Kitty Rhythm TD</a> · <a href="https://tavareschan.itch.io/wild-magic">Wild Magic</a></sub>
 
 ### Inventory
 

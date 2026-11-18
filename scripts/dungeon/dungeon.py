@@ -295,7 +295,10 @@ def github_stats(user: str, today: dt.date, lookback: int, token: str | None) ->
             continue
         label = repo["name"] if repo["owner"]["login"].lower() == user.lower() else repo["nameWithOwner"]
         for node in entry["contributions"]["nodes"]:
-            day = days.setdefault(node["occurredAt"][:10], {})
+            date = node["occurredAt"][:10]
+            if not since.isoformat() <= date < today.isoformat():  # the API leaks today in
+                continue
+            day = days.setdefault(date, {})
             day.setdefault(repo["nameWithOwner"], [label, repo["url"], 0])[2] += node["commitCount"]
     last_day = max(days, default=None)
     activity = sorted(days.get(last_day, {}).values(), key=lambda r: (-r[2], r[0].lower()))
@@ -410,20 +413,21 @@ def render_svg(grid, marks, message, status, caption, palette) -> str:
 
 
 def legend(rooms: list[dict], extra: list[dict], portfolio: str) -> str:
-    parts = [f"`{i + 1}` [{r['name']}]({r['url']}) ×{r['commits']}" for i, r in enumerate(rooms)]
+    """One HTML line; it sits inside a <sub>, where markdown isn't parsed."""
+    link = lambda r: f'<a href="{escape(r["url"])}">{escape(r["name"])}</a>'
+    parts = [f"<code>{i + 1}</code> {link(r)} ×{r['commits']}" for i, r in enumerate(rooms)]
     if all(r["url"] != portfolio for r in rooms):
-        parts.append(f"`>` [portfolio]({portfolio})")
-    text = " &nbsp;·&nbsp; ".join(parts)
+        parts.append(f'<code>&gt;</code> <a href="{portfolio}">portfolio</a>')
     if extra:
-        text += f"<br>\n<sub>+{len(extra)} more: " + ", ".join(f"[{r['name']}]({r['url']})" for r in extra) + "</sub>"
-    return text
+        parts.append(f"+{len(extra)} more: " + ", ".join(link(r) for r in extra))
+    return " · ".join(parts)
 
 
 def update_readme(path: Path, text: str) -> bool:
     start, end = "<!-- dungeon:start -->", "<!-- dungeon:end -->"
     readme = path.read_text(encoding="utf-8")
     i, j = readme.index(start) + len(start), readme.index(end)
-    new = readme[:i] + "\n" + text + "\n" + readme[j:]
+    new = readme[:i] + text + readme[j:]  # same line: GitHub splits HTML blocks on comment lines
     if new == readme:
         return False
     path.write_text(new, encoding="utf-8")

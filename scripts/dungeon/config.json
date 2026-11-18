@@ -1,0 +1,11 @@
+{
+  "user": "Ggargur",
+  "hero": "Tavaresh",
+  "title": "the Game Dev",
+  "portfolio": "https://github.com/Ggargur/portfolio",
+  "lookback_days": 30,
+  "max_rooms": 9,
+  "width": 78,
+  "height": 22,
+  "weights": { " ": 200, "#": 5 }
+}
